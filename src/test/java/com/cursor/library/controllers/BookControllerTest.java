@@ -1,7 +1,12 @@
 package com.cursor.library.controllers;
 
+import static org.junit.jupiter.api.Assertions.*;
+
+import com.cursor.library.daos.BookDao;
 import com.cursor.library.models.Book;
 import com.cursor.library.models.CreateBookDto;
+import com.fasterxml.jackson.core.type.TypeReference;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
@@ -10,11 +15,19 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
 import java.util.Arrays;
+import java.util.List;
 
-public class BookControllerTest extends BaseControllerTest {
+class BookControllerTest extends BaseControllerTest {
+
+    private BookDao bookDao;
+
+    @BeforeAll
+    void setUp() {
+        bookDao = new BookDao();
+    }
 
     @Test
-    public void createBookTest() throws Exception {
+        void createBookTest() throws Exception {
         CreateBookDto createBookDto = new CreateBookDto();
         createBookDto.setName("Cool createBookDto");
         createBookDto.setDescription("Cool description");
@@ -36,7 +49,80 @@ public class BookControllerTest extends BaseControllerTest {
                 Book.class
         );
 
+        bookDao.addBook(book);
+
         mockMvc.perform(MockMvcRequestBuilders.get("/books/" + book.getBookId()))
                 .andExpect(MockMvcResultMatchers.status().isOk());
+    }
+
+    @Test
+    void getAllTest() throws Exception {
+        MockHttpServletRequestBuilder requestBuilder = MockMvcRequestBuilders.get("/books");
+
+        MvcResult result = mockMvc.perform(requestBuilder)
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andReturn();
+
+        List<Book> books = OBJECT_MAPPER.readValue(
+                result.getResponse().getContentAsString(),
+                new TypeReference<>() {
+                }
+        );
+
+        List<Book> booksFromDB = bookDao.getAll();
+
+        assertEquals(booksFromDB, books);
+    }
+
+    @Test
+    void getByIdSuccessTest() throws Exception {
+        Book bookFromDao = bookDao.getById("random_id_value_1");
+
+        MockHttpServletRequestBuilder requestBuilder = MockMvcRequestBuilders.get("/books/" + bookFromDao.getBookId());
+
+        MvcResult result = mockMvc.perform(requestBuilder)
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andReturn();
+
+        Book book = OBJECT_MAPPER.readValue(
+                result.getResponse().getContentAsString(),
+                Book.class
+        );
+
+        assertEquals(bookFromDao, book);
+    }
+
+    @Test
+    void getByIdExpectNotFoundStatus() throws Exception {
+        MockHttpServletRequestBuilder requestBuilder = MockMvcRequestBuilders.get("/books/random_id");
+
+        mockMvc.perform(requestBuilder)
+                .andExpect(MockMvcResultMatchers.status().isNotFound());
+    }
+
+    @Test
+    void deleteByIdSuccessTest() throws Exception {
+        Book bookFromDao = bookDao.getById("random_id_value_1");
+
+        MockHttpServletRequestBuilder requestBuilder = MockMvcRequestBuilders.delete("/books/" + bookFromDao.getBookId());
+
+        MvcResult result = mockMvc.perform(requestBuilder)
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andReturn();
+
+        Book book = OBJECT_MAPPER.readValue(
+                result.getResponse().getContentAsString(),
+                Book.class
+        );
+
+        assertEquals(bookFromDao, book);
+    }
+
+    @Test
+    void deleteByIdExpectNotFoundStatusTest() throws Exception {
+        MockHttpServletRequestBuilder requestBuilder = MockMvcRequestBuilders.delete("/books/random_id");
+
+        mockMvc.perform(requestBuilder)
+                .andExpect(MockMvcResultMatchers.status().isNotFound());
     }
 }
